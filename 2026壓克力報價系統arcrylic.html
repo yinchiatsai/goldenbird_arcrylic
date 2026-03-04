@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>JINQUE | 金雀職人報價系統 v9.9</title>
+    <style>
+        :root {
+            --primary: #26515e;
+            --gold: #f39c12;
+            --bg: #f4f7f6;
+            --white: #ffffff;
+            --warn: #e67e22;
+            --success: #27ae60;
+            --danger: #d9534f;
+        }
+
+        body {
+            font-family: -apple-system, sans-serif;
+            background: var(--bg);
+            margin: 0;
+            padding: 15px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background: var(--white);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            padding: 25px;
+            box-sizing: border-box;
+        }
+
+        header {
+            border-bottom: 2px solid var(--primary);
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            text-align: center;
+        }
+
+        header h1 {
+            color: var(--primary);
+            font-size: 20px;
+            margin: 0;
+            letter-spacing: 2px;
+        }
+
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        .row>div {
+            flex: 1;
+            min-width: 140px;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: #444;
+        }
+
+        select,
+        input {
+            width: 100%;
+            height: 45px;
+            padding: 0 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 15px;
+            box-sizing: border-box;
+            background-color: #fafafa;
+        }
+
+        .option-group {
+            background: #fdfaf0;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #e2d1a3;
+        }
+
+        .result-box {
+            background: var(--primary);
+            color: var(--white);
+            padding: 25px 20px;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        .price {
+            font-size: 52px;
+            font-weight: 800;
+            color: var(--gold);
+            margin: 5px 0;
+            line-height: 1;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 50px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .std-badge {
+            background: var(--success);
+            color: white;
+        }
+
+        .custom-badge {
+            background: var(--warn);
+            color: white;
+        }
+
+        .script-area {
+            background: #f4f7f6;
+            border-left: 5px solid var(--primary);
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 14px;
+            line-height: 1.6;
+            border-radius: 8px;
+            color: #333;
+        }
+
+        .logic-tag {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            background: #e9ecef;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <header>
+            <h1>JINQUE 金雀報價 v9.9</h1>
+        </header>
+
+        <div class="row">
+            <div>
+                <label>工藝規格</label>
+                <select id="type" onchange="calc()">
+                    <option value="full">滿版背印</option>
+                    <option value="transparent">透明背印</option>
+                </select>
+            </div>
+            <div>
+                <label>切割造型</label>
+                <select id="shapeType" onchange="calc()">
+                    <option value="none">標準矩形</option>
+                    <option value="custom">特殊造型 (+120)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="row">
+            <div><label>寬度 (cm)</label><input type="number" id="w" value="7" step="0.1" oninput="calc()"></div>
+            <div><label>高度 (cm)</label><input type="number" id="h" value="2" step="0.1" oninput="calc()"></div>
+        </div>
+
+        <div class="option-group">
+            <label style="color: #8a6d3b; font-weight: 800; margin-bottom: 10px;">🛠️ 加工選配 (工藝互斥)</label>
+            <div class="row" style="margin-bottom: 0;">
+                <div>
+                    <label>印製面</label>
+                    <select id="sides" onchange="checkConflict()">
+                        <option value="single">單面印製</option>
+                        <option value="double">雙面印製</option>
+                    </select>
+                </div>
+                <div>
+                    <label>背膠服務</label>
+                    <select id="adhesive" onchange="calc()">
+                        <option value="none">不需背膠</option>
+                        <option value="yes">需要強力背膠</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="result-box">
+            <div id="modeBadge" class="badge"></div>
+            <div class="price" id="totalPrice">$0</div>
+            <div id="notice" style="font-size: 11px; opacity: 0.8; margin-top: 8px;"></div>
+        </div>
+
+        <div class="script-area" id="scriptContent"></div>
+    </div>
+
+    <script>
+        function checkConflict() {
+            const isDouble = document.getElementById('sides').value === 'double';
+            if (isDouble) document.getElementById('adhesive').value = 'none';
+            calc();
+        }
+
+        function calc() {
+            const type = document.getElementById('type').value;
+            const isShape = document.getElementById('shapeType').value === 'custom';
+            const hasAdhesive = document.getElementById('adhesive').value === 'yes';
+            const isDouble = document.getElementById('sides').value === 'double';
+
+            let w = Math.max(0.1, parseFloat(document.getElementById('w').value) || 0);
+            let h = Math.max(0.1, parseFloat(document.getElementById('h').value) || 0);
+            if (h > w) [w, h] = [h, w];
+            const area = w * h;
+
+            const stdPrices = {
+                xs: (type === 'full' ? 250 : 220),
+                s: (type === 'full' ? 650 : 550),
+                m: (type === 'full' ? 750 : 650),
+                l: (type === 'full' ? 900 : 750)
+            };
+
+            let basePrice = 0;
+            let mode = "custom";
+            let logicDetails = [];
+
+            const isClose = (v, target) => Math.abs(v - target) <= 0.25;
+            if (!isShape) {
+                if (isClose(w, 7) && isClose(h, 2)) { basePrice = stdPrices.xs; mode = "std"; logicDetails.push("符合 7x2 標準優惠價"); }
+                else if (isClose(w, 15) && isClose(h, 9.5)) { basePrice = stdPrices.s; mode = "std"; logicDetails.push("符合 15x9.5 標準優惠價"); }
+                else if (isClose(w, 20) && isClose(h, 15)) { basePrice = stdPrices.m; mode = "std"; logicDetails.push("符合 20x15 標準優惠價"); }
+                else if ((isClose(w, 30) && isClose(h, 20)) || (isClose(w, 29.7) && isClose(h, 21))) { basePrice = stdPrices.l; mode = "std"; logicDetails.push("符合 30x20 標準優惠價"); }
+            }
+
+            if (mode === "custom") {
+                if (area <= 18) {
+                    // 接近 7x2 (面積14) 的微調，如 8x2
+                    basePrice = 270;
+                    logicDetails.push("微型件客製階梯價 ($270)");
+                }
+                else if (area <= 28) {
+                    // 如 9x3、10x2.5
+                    basePrice = 300;
+                    logicDetails.push("微型件客製階梯價 ($300)");
+                }
+                else if (area <= 50) {
+                    // 如 10x4、12x4
+                    basePrice = 300 + (area - 28) * 4;
+                    logicDetails.push("小型件線性計價");
+                }
+                else if (area <= 142.5) {
+                    let calcBase = 380 + (area - 50) * 2.8 + 60;
+                    basePrice = Math.min(calcBase, stdPrices.s);
+                    logicDetails.push(basePrice >= stdPrices.s ? "接近 15x9.5 級別保護" : "線性面積計價");
+                }
+                else if (area <= 300) {
+                    let calcBase = stdPrices.s + (area - 142.5) * 0.65 + 60;
+                    basePrice = Math.min(calcBase, stdPrices.m);
+                    logicDetails.push(basePrice >= stdPrices.m ? "接近 20x15 級別保護" : "線性面積計價");
+                }
+                else if (area <= 600) {
+                    let calcBase = stdPrices.m + (area - 300) * 0.5 + 60;
+                    basePrice = Math.min(calcBase, stdPrices.l);
+                    logicDetails.push(basePrice >= stdPrices.l ? "接近 30x20 級別保護" : "線性面積計價");
+                }
+                else {
+                    let overBase = (type === 'full' ? 1150 : 1000);
+                    basePrice = overBase + (area - 630) * (type === 'full' ? 1.8 : 1.4);
+                    logicDetails.push("超大型規格特殊計價");
+                }
+                if (isShape) { basePrice += 120; logicDetails.push("特殊造型切割工本 +$120"); }
+            } else if (isShape) {
+                basePrice += 120; logicDetails.push("標準尺寸特殊造型 +$120");
+            }
+
+            // 雙面加價邏輯
+            let sideAddon = 0;
+            if (isDouble) {
+                if (area <= 15) sideAddon = 70;
+                else if (area <= 30) sideAddon = 100;
+                else if (area <= 60) sideAddon = 150;
+                else sideAddon = basePrice * 0.5;
+                logicDetails.push(`雙面印製加價: +$${Math.round(sideAddon)}`);
+            }
+
+            // 背膠計價
+            let adhesivePrice = 0;
+            if (hasAdhesive && !isDouble) {
+                if (area <= 25) adhesivePrice = 50;
+                else if (area <= 142.5) adhesivePrice = 80;
+                else if (area <= 300) adhesivePrice = 100;
+                else adhesivePrice = 150;
+                logicDetails.push(`強力背膠手工費: +$${adhesivePrice}`);
+            }
+
+            const finalPrice = Math.ceil((basePrice + sideAddon + adhesivePrice) / 10) * 10;
+            document.getElementById('totalPrice').innerText = `$${finalPrice}`;
+            document.getElementById('modeBadge').innerText = (mode === "std") ? "賣場標準規格" : "職人客製規格";
+            document.getElementById('modeBadge').className = (mode === "std") ? "badge std-badge" : "badge custom-badge";
+
+            document.getElementById('scriptContent').innerHTML = `
+            <b>💬 客服回覆建議：</b><br>
+            您好！報價 ${w}x${h}cm ${isDouble ? '雙面' : '單面'}${isShape ? '造型' : ''}${hasAdhesive ? '(含背膠)' : ''}，總金額為 <b>$${finalPrice}</b> 元。<br><br>
+            <div style="border-top: 1px dashed #ccc; padding-top: 10px;">
+                <b>🛠️ 報價成因分析 (客服參考)：</b><br>
+                ${logicDetails.map(item => `<span class="logic-tag">● ${item}</span>`).join('')}
+            </div>
+        `;
+            document.getElementById('notice').innerText = (mode === "std") ? "✨ 已套用現成尺寸優惠" : "💡 含客製規格手工開料費";
+        }
+        calc();
+    </script>
+</body>
+
+</html>
