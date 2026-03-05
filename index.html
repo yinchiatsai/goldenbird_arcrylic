@@ -4,11 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>金雀 | 職人報價系統 v13.5</title>
+    <title>金雀 | 職人報價系統 v13.6.1</title>
     <style>
         :root {
             --primary: #26515e;
-            /* 金雀品牌色 */
             --gold: #f39c12;
             --bg: #f4f7f6;
             --white: #ffffff;
@@ -95,6 +94,7 @@
             border-radius: 15px;
             margin-bottom: 15px;
             border: 1px solid #e2d1a3;
+            position: relative;
         }
 
         .result-box {
@@ -131,11 +131,6 @@
             color: white;
         }
 
-        .limit-badge {
-            background: #000;
-            color: white;
-        }
-
         .script-area {
             background: #f4f7f6;
             border-left: 5px solid var(--primary);
@@ -157,6 +152,14 @@
             margin-top: 6px;
         }
 
+        .warn-text {
+            color: var(--danger);
+            font-size: 11px;
+            font-weight: bold;
+            margin-top: 5px;
+            display: none;
+        }
+
         .hidden {
             display: none;
         }
@@ -167,13 +170,13 @@
 
     <div class="container">
         <header>
-            <h1>JINQUE 金雀報價 v13.5</h1>
+            <h1>JINQUE 金雀報價 v13.6.1</h1>
         </header>
 
         <div class="row">
             <div>
                 <label>工藝規格</label>
-                <select id="type" onchange="calc()">
+                <select id="type" onchange="checkConflict()">
                     <option value="full">滿版背印</option>
                     <option value="transparent">透明背印</option>
                 </select>
@@ -188,8 +191,8 @@
         </div>
 
         <div class="row">
-            <div><label>邊長 A (cm)</label><input type="number" id="w" value="7" step="0.1" oninput="calc()"></div>
-            <div><label>邊長 B (cm)</label><input type="number" id="h" value="2" step="0.1" oninput="calc()"></div>
+            <div><label>邊長 A (cm)</label><input type="number" id="w" value="15" step="0.1" oninput="calc()"></div>
+            <div><label>邊長 B (cm)</label><input type="number" id="h" value="9.5" step="0.1" oninput="calc()"></div>
         </div>
 
         <div class="option-group">
@@ -217,6 +220,7 @@
                         <option value="none">不需背膠</option>
                         <option value="yes">需要強力背膠</option>
                     </select>
+                    <div id="adhesiveWarn" class="warn-text">⚠️ 透明背印不可加背膠，以免影響視覺。</div>
                 </div>
             </div>
         </div>
@@ -231,10 +235,13 @@
 
     <script>
         function checkConflict() {
+            const type = document.getElementById('type').value;
             const sides = document.getElementById('sides').value;
             const doubleRow = document.getElementById('doubleRow');
             const adhesiveEl = document.getElementById('adhesive');
+            const adhesiveWarn = document.getElementById('adhesiveWarn');
 
+            // 雙面 vs 背膠 衝突
             if (sides === 'double') {
                 doubleRow.classList.remove('hidden');
                 adhesiveEl.value = 'none';
@@ -242,8 +249,17 @@
                 adhesiveEl.style.opacity = '0.5';
             } else {
                 doubleRow.classList.add('hidden');
-                adhesiveEl.disabled = false;
-                adhesiveEl.style.opacity = '1';
+                // 透明背印 vs 背膠 衝突
+                if (type === 'transparent') {
+                    adhesiveEl.value = 'none';
+                    adhesiveEl.disabled = true;
+                    adhesiveEl.style.opacity = '0.5';
+                    adhesiveWarn.style.display = 'block';
+                } else {
+                    adhesiveEl.disabled = false;
+                    adhesiveEl.style.opacity = '1';
+                    adhesiveWarn.style.display = 'none';
+                }
             }
             calc();
         }
@@ -271,7 +287,6 @@
             let basePrice = 0;
             let tierName = "";
 
-            // --- v13.5 核心階梯邏輯 ---
             if (area <= 14.1) { basePrice = 130; tierName = "XS 標準級"; }
             else if (area <= 22) { basePrice = 180; tierName = "XS 微型過渡 (一)"; }
             else if (area <= 35) { basePrice = 260; tierName = "XS 微型過渡 (二)"; }
@@ -286,13 +301,14 @@
                 tierName = "特大件風險跳階";
             }
 
-            // 透明工藝折扣 (85折並取整到10位)
             if (type === 'transparent') basePrice = Math.round((basePrice * 0.85) / 10) * 10;
 
-            // 造型費
-            if (isShape) basePrice += (area <= 22 ? 30 : (area <= 100 ? 60 : 120));
+            let shapeFee = 0;
+            if (isShape) {
+                shapeFee = (area <= 22 ? 30 : (area <= 100 ? 60 : 120));
+                basePrice += shapeFee;
+            }
 
-            // 雙面加價 (v13.5 核心修正：區分同圖 1.3 與 異圖 1.5)
             let final = basePrice;
             let sideText = "單面";
             if (isDouble) {
@@ -301,8 +317,13 @@
                 sideText = (doubleType === 'same') ? "雙面(同圖)" : "雙面(不同圖)";
             }
 
-            // 背膠費
-            if (hasAdhesive) final += (area <= 100 ? 50 : 100);
+            let adhesiveFee = 0;
+            if (hasAdhesive) {
+                if (area <= 100) adhesiveFee = 50;
+                else if (area <= 300) adhesiveFee = 80;
+                else adhesiveFee = 100;
+                final += adhesiveFee;
+            }
 
             document.getElementById('totalPrice').innerText = `$${final}`;
             document.getElementById('scriptContent').innerHTML = `
@@ -312,11 +333,12 @@
                 <b>🛠️ 報價分析：</b><br>
                 <span class="logic-tag">● 判定：${tierName}</span>
                 <span class="logic-tag">● 工序：${sideText} 排版計價</span>
-                ${isShape ? '<span class="logic-tag">● 包含特殊造型費</span>' : ''}
+                ${isShape ? `<span class="logic-tag">● 包含特殊造型費：$${shapeFee}</span>` : ''}
+                ${hasAdhesive ? `<span class="logic-tag">● 包含強力背膠費：$${adhesiveFee}</span>` : ''}
+                ${type === 'transparent' ? `<span class="logic-tag" style="color:red">● 提醒：透明工藝不建議加背膠</span>` : ''}
             </div>
         `;
         }
-        // 初始化
         checkConflict();
     </script>
 </body>
